@@ -1,4 +1,4 @@
-from gym_flp.envs.flp_env_Vers1_2D_Umgebung_v1 import qapEnv
+from gym_flp.envs.flp_env_Vers1_2D_Umgebung_v2 import qapEnv
 import tensorflow as tf
 import tensorflow
 #from tensorflow.keras.datasets import cifar10
@@ -16,7 +16,7 @@ import os
 from tqdm import tqdm
 
 
-DISCOUNT = 0.5
+DISCOUNT = 1
 REPLAY_MEMORY_SIZE = 500  # How many last steps to keep for model training
 MIN_REPLAY_MEMORY_SIZE = 100  # Minimum number of steps in a memory to start training
 MINIBATCH_SIZE = 64  # How many steps (samples) to use for training
@@ -24,13 +24,13 @@ UPDATE_TARGET_EVERY = 5  # Terminal states (end of episodes)
 env=qapEnv(mode ='rgb_array', instance='Neos-n7')
 
 
-EPISODES = 10000
+EPISODES = 5000
 MIN_REWARD = -1000  # For model save
-MODEL_NAME = 'Neos-n7-reward-mhc-3'   #64 Filter und 2 Convolutional Layer
+MODEL_NAME = 'Neos-n7-reward-mhc-5'   #64 Filter und 2 Convolutional Layer
 
 # Exploration settings
-epsilon = 1  # Anfang 100% Exploration
-EPSILON_DECAY = 0.9997
+epsilon = 0.9  # Anfang 100% Exploration
+EPSILON_DECAY = 0.999
 MIN_EPSILON = 0.001
 
 
