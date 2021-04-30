@@ -1,9 +1,7 @@
-from gym_flp.envs.flp_env_Vers1_2D_Umgebung_v2 import qapEnv
+from gym_flp.envs.flp_env_Vers1_2D_Umgebung_v3 import qapEnv
 import tensorflow as tf
 import tensorflow
-#from tensorflow.keras.datasets import cifar10
-#from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from tensorflow.keras.models import Sequential
+from tensorflow.keras.models import Sequential, load_model
 from tensorflow.keras.layers import Dense, Dropout, Conv2D, MaxPooling2D, Activation, Flatten
 from tensorflow.keras.callbacks import TensorBoard
 from tensorflow.keras.optimizers import Adam
@@ -12,30 +10,34 @@ import numpy as np
 import time
 import random
 import os
-#import matplotlib.pyplot
 from tqdm import tqdm
 
 
+#Für einen möglichen weiteren kompletten Durchgang mit vorhandenem Modell (entsprechendes Modell einfügen)
+#LOAD_MODEL = "models/Neos-n7-long-run-r=differenz-vorher-nachher-6-aktionen-neu___820.00max__337.36avg____0.00min__1619626400.model"
+LOAD_MODEL = None
+
+
 DISCOUNT = 0.8
-REPLAY_MEMORY_SIZE = 500  # How many last steps to keep for model training
+REPLAY_MEMORY_SIZE = 30000  # How many last steps to keep for model training
+#REPLAY_MEMORY_SIZE = 8000
 MIN_REPLAY_MEMORY_SIZE = 100  # Minimum number of steps in a memory to start training
 MINIBATCH_SIZE = 64  # How many steps (samples) to use for training
 UPDATE_TARGET_EVERY = 5  # Terminal states (end of episodes)
 env=qapEnv(mode ='rgb_array', instance='Neos-n7')
 
 
-EPISODES = 3000
-MIN_REWARD = -1000  # For model save
-MODEL_NAME = 'Neos-n7-reward-mhc-8'   #64 Filter und 2 Convolutional Layer
+EPISODES = 30000
+MODEL_NAME = 'Neos-n7-reward-Differenz-vorher-nachher'   #64 Filter und 2 Convolutional Layer
 
 # Exploration settings
 epsilon = 1  # Anfang 100% Exploration
-EPSILON_DECAY = 0.999
+EPSILON_DECAY = 0.9999 #für long run diff vorher nachher
 MIN_EPSILON = 0.001
 
 
 #  Stats settings
-AGGREGATE_STATS_EVERY = 20  # episodes
+AGGREGATE_STATS_EVERY = 50
 SHOW_PREVIEW = False
 
 
@@ -121,23 +123,26 @@ class DQNAgent:
         self.target_update_counter = 0
 
     def create_model(self):
-        model = Sequential()
+        if LOAD_MODEL is not None:
+            model = load_model(LOAD_MODEL)
+        else:
+            model = Sequential()
 
-        model.add(Conv2D(64, (2, 2), input_shape=env.observation_space_values))  # OBSERVATION_SPACE_VALUES = (10, 10, 3) a 10x10 RGB image.
-        model.add(Activation('relu'))
-        #model.add(MaxPooling2D(pool_size=(2, 2)))
-        model.add(Dropout(0.2))
+            model.add(Conv2D(64, (2, 2), input_shape=env.observation_space_values))  # OBSERVATION_SPACE_VALUES = (10, 10, 3) a 10x10 RGB image.
+            model.add(Activation('relu'))
+            #model.add(MaxPooling2D(pool_size=(2, 2)))
+            model.add(Dropout(0.2))
 
-        model.add(Conv2D(64, (2, 2)))
-        model.add(Activation('relu'))
-        #model.add(MaxPooling2D(pool_size=(2, 2)))
-        model.add(Dropout(0.2))
+            model.add(Conv2D(64, (2, 2)))
+            model.add(Activation('relu'))
+            #model.add(MaxPooling2D(pool_size=(2, 2)))
+            model.add(Dropout(0.2))
 
-        model.add(Flatten())  # this converts our 3D feature maps to 1D feature vectors
-        model.add(Dense(64))
+            model.add(Flatten())  # this converts our 3D feature maps to 1D feature vectors
+            model.add(Dense(64))
 
-        model.add(Dense(len(env.actions), activation='linear'))  # ACTION_SPACE_SIZE = how many choices (9)
-        model.compile(loss="mse", optimizer=Adam(lr=0.01))
+            model.add(Dense(len(env.actions), activation='linear'))  # ACTION_SPACE_SIZE = how many choices (9)
+            model.compile(loss="mse", optimizer=Adam(lr=0.001))
         return model
 
     def update_replay_memory(self, transition):
@@ -253,11 +258,12 @@ for episode in tqdm(range(1, EPISODES + 1), ascii=True, unit='episodes'):
         average_reward = sum(ep_rewards[-AGGREGATE_STATS_EVERY:])/len(ep_rewards[-AGGREGATE_STATS_EVERY:])
         min_reward = min(ep_rewards[-AGGREGATE_STATS_EVERY:])
         Minimum_costs = min(ep_Minimums[-AGGREGATE_STATS_EVERY:])
+        average_min_costs = sum(ep_Minimums[-AGGREGATE_STATS_EVERY:])/len(ep_Minimums[-AGGREGATE_STATS_EVERY:])
         max_reward = max(ep_rewards[-AGGREGATE_STATS_EVERY:])
-        agent.tensorboard.update_stats(Costs_Minimum=Minimum_costs, reward_avg=average_reward, reward_min=min_reward, reward_max=max_reward, epsilon=epsilon)
+        agent.tensorboard.update_stats(Costs_Minimum=Minimum_costs, Average_costs_minimum=average_min_costs, reward_avg=average_reward, reward_min=min_reward, reward_max=max_reward, epsilon=epsilon)
 
         # Save model, but only when min reward is greater or equal a set value
-        if average_reward >= MIN_REWARD:
+        if episode % 1000 == 0:
             agent.model.save(f'models/{MODEL_NAME}__{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.model')
 
     # Decay epsilon
@@ -265,6 +271,5 @@ for episode in tqdm(range(1, EPISODES + 1), ascii=True, unit='episodes'):
         epsilon *= EPSILON_DECAY
         epsilon = max(MIN_EPSILON, epsilon)
 
-#print(best_state)
-#print(Actual_Minimum)
+agent.model.save(f'models/{MODEL_NAME}__{max_reward:_>7.2f}max_{average_reward:_>7.2f}avg_{min_reward:_>7.2f}min__{int(time.time())}.model')
 env.close()
